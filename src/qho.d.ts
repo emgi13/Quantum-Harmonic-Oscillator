@@ -5,4 +5,5 @@ declare interface QHOProps {
   length: number;
   mass: number;
   k: number;
+  edge_v_inf?: boolean;
 }

@@ -1,10 +1,10 @@
 import React from 'react';
-import { add, BigNumber, eigs, MathCollection, Matrix, matrix, multiply, zeros } from 'mathjs';
+import { abs, add, BigNumber, eigs, MathCollection, Matrix, multiply, sparse, zeros } from 'mathjs';
 import p5 from 'p5';
 import './styles.scss';
 
 const App = () => {
-  return <QHO k={100000} length={201} mass={1} />
+  return <QHO k={5e4} length={1001} mass={1} edge_v_inf={true} />
 }
 
 class QHO extends React.Component<QHOProps> {
@@ -18,7 +18,7 @@ class QHO extends React.Component<QHOProps> {
   xs: number[];
   vs: number[];
   V: Matrix;
-  basis: Matrix;
+  // basis: Matrix;
   dx: number;
   lap: Matrix;
   H: Matrix;
@@ -36,16 +36,18 @@ class QHO extends React.Component<QHOProps> {
     this.xs = Array.from({ length: length }).map((_, ind) => ind * 1.0 / (length - 1))
     // Define the potential 
     this.vs = this.xs.map(v => 0.5 * k * (v - 0.5) ** 2)
-    this.V = matrix(zeros(length, length));
+    if (this.props.edge_v_inf) {
+      this.vs[0] = 1e30;
+      this.vs[length - 1] = 1e30;
+    }
+    this.V = sparse(zeros(length, length));
     this.vs.forEach((val, ind) => this.V.set([ind, ind], val))
     // make basis matrix
-    this.basis = matrix(zeros(length, length));
-    this.xs.forEach((val, ind) => this.basis.set([ind, ind], val))
-    console.log(this.basis)
+    // this.basis = sparse(zeros(length, length));
+    // this.xs.forEach((val, ind) => this.basis.set([ind, ind], val))
     this.dx = this.xs[1] - this.xs[0];
-    console.log(this.dx)
     // laplacian matrix
-    this.lap = matrix(zeros(this.basis.size()));
+    this.lap = sparse(zeros(this.V.size()));
     this.xs.forEach((_, ind: number) => {
       this.lap.set([ind, ind], -2.0 / this.dx / this.dx)
       if (ind > 0) {
@@ -59,7 +61,7 @@ class QHO extends React.Component<QHOProps> {
     this.H = add(multiply(this.lap, -1 / 2.0 / mass), this.V)
     // Eiqenvectors
     this.ev = eigs(this.H).eigenvectors;
-    console.log(this.ev[0])
+    console.log("DONE INIT CALC")
 
     // binds
     this.handleScroll = this.handleScroll.bind(this);
@@ -118,26 +120,23 @@ class QHO extends React.Component<QHOProps> {
       p.background(0, 0, 0);
       p.frameRate(this.frameRate);
       p.strokeWeight(0.3);
-      p.noLoop()
+      p.stroke('white')
       window.addEventListener("scroll", this.handleScrollDebounced, {
         passive: true,
       });
     };
 
     p.draw = () => {
-      p.stroke('white')
-      p.strokeWeight(0.3)
-      const scale = 400;
-      this.ev.forEach((state, level) => {
-        if (level < 10) {
-          const ys: any = state.vector.valueOf();
-          for (let i = 1; i < this.props.length; i++) {
+      p.clear()
+      p.background(0, 0, 0);
+      const scale = 800;
+      const state = this.ev[this.frameNo % this.props.length];
+      const ys: any = state.vector.valueOf();
+      for (let i = 1; i < this.props.length; i++) {
 
-            p.line(this.xs[i - 1] * scale, scale * (1 - ys[i - 1]), this.xs[i] * scale, (1 - ys[i]) * scale)
-          }
-        }
-
-      });
+        p.line(this.xs[i - 1] * scale, scale * (1 - abs(ys[i - 1])), this.xs[i] * scale, (1 - abs(ys[i])) * scale)
+      }
+      this.frameNo += 1;
     }
   }
 
